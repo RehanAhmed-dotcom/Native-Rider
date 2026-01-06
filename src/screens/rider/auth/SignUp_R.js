@@ -1,0 +1,1223 @@
+import {
+  FlatList,
+  Image,
+  Keyboard,
+  KeyboardAvoidingView,
+  Linking,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import React, {useRef, useState, useEffect} from 'react';
+import {images, fonts, Colors, styles} from '../../../constant/Index';
+import {
+  widthPercentageToDP as wp,
+  heightPercentageToDP as hp,
+} from 'react-native-responsive-screen';
+import MainButton from '../../../components/MainButton';
+import Header from '../../../components/Header';
+import AntDesign from 'react-native-vector-icons/AntDesign';
+import Feather from 'react-native-vector-icons/Feather';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import PhoneInput from 'react-native-phone-number-input';
+import ImageCropPicker from 'react-native-image-crop-picker';
+import Toast from 'react-native-toast-message';
+import {Dropdown} from 'react-native-element-dropdown';
+import Ionicons from 'react-native-vector-icons/Ionicons';
+import {Formik} from 'formik';
+import * as yup from 'yup';
+import {AllGetAPI, PostAPiwithToken} from '../../../components/ApiRoot';
+import Loader from '../../../components/Loader';
+import {LoginManager, AccessToken} from 'react-native-fbsdk-next';
+
+const SignUp_R = ({navigation}) => {
+  const phoneInput = useRef(null);
+  const [value, setValue] = useState('');
+  const [isFocus, setIsFocus] = useState(false);
+  const [formattedValue, setFormattedValue] = useState('');
+  const [image, setimage] = useState();
+  const [show, setshow] = useState(false);
+  const [selectionstatus, setSelectionStatus] = useState(null);
+  const [isPasswordEntered, setIsPasswordEntered] = useState(false);
+  const [isloading, setIsLoading] = useState(false);
+  const selection = [
+    {label: 'Yes', value: 'yes'},
+    {label: 'No', value: 'no'},
+  ];
+
+  const [keyboardStatus, setKeyboardStatus] = useState(false);
+
+  useEffect(() => {
+    const showSubscription = Keyboard.addListener('keyboardDidShow', () => {
+      setKeyboardStatus(true);
+    });
+    const hideSubscription = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardStatus(false);
+    });
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
+
+  const upload = async setFieldValue => {
+    try {
+      const image = await ImageCropPicker.openPicker({
+        width: 400,
+        height: 400,
+        cropping: true,
+        compressImageQuality: 1,
+      });
+      console.log('image', image);
+      if (image && image.path) {
+        setFieldValue('image', image.path);
+      } else {
+        console.error('No image path found');
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+    }
+  };
+
+  const [terms, setTerms] = useState(false);
+
+  const dayRef = useRef(null);
+  const monthRef = useRef(null);
+  const yearRef = useRef(null);
+
+  const handleDayChange = (text, setFieldValue) => {
+    let day = parseInt(text, 10);
+    if (day > 31) day = 31;
+    setFieldValue('dob.day', day ? day.toString() : '');
+    if (text.length === 2) {
+      monthRef.current.focus();
+    }
+  };
+
+  const handleMonthChange = (text, setFieldValue) => {
+    let month = parseInt(text, 10);
+    if (month > 12) month = 12;
+    setFieldValue('dob.month', month ? month.toString() : '');
+    if (text.length === 2) {
+      yearRef.current.focus();
+    }
+  };
+
+  const calculateAge = dob => {
+    const {day, month, year} = dob;
+    if (!day || !month || !year) return '';
+    const birthDate = new Date(year, month - 1, day);
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDifference = today.getMonth() - birthDate.getMonth();
+    if (
+      monthDifference < 0 ||
+      (monthDifference === 0 && today.getDate() < birthDate.getDate())
+    ) {
+      age--;
+    }
+    return age.toString();
+  };
+
+  const handleFacebookLogin = async (setFieldValue, values) => {
+    try {
+      // Request permissions
+      const result = await LoginManager.logInWithPermissions([
+        'public_profile',
+        'email',
+      ]);
+      console.log('Facebook login result:', result);
+
+      if (result.isCancelled) {
+        Toast.show({
+          type: 'info',
+          text1: 'Login Cancelled',
+          text2: 'Facebook login was cancelled.',
+          topOffset: Platform.OS === 'ios' ? 20 : 0,
+          visibilityTime: 3000,
+          autoHide: true,
+        });
+        return;
+      }
+
+      // Get access token
+      const data = await AccessToken.getCurrentAccessToken();
+      if (!data) {
+        throw new Error('Failed to obtain access token');
+      }
+
+      // Fetch user profile data
+      const response = await fetch(
+        `https://graph.facebook.com/v16.0/me?fields=id,name,first_name,last_name,email,picture&access_token=${data.accessToken}`,
+      );
+      const profileData = await response.json();
+      console.log('Facebook profile data:', profileData);
+
+      if (profileData) {
+        const {first_name, last_name, email, picture, id} = profileData;
+
+        // Default DOB (since birthday is not reliably available)
+        const dob = {day: '', month: '', year: ''};
+        const age = calculateAge(dob).toString();
+
+        // Populate Formik fields
+        setFieldValue('firstname', first_name || '');
+        setFieldValue('lastname', last_name || '');
+        setFieldValue('email', email || `${id}@facebook.com`);
+        setFieldValue('dob', dob);
+        setFieldValue('age', age);
+        setFieldValue('image', picture?.data?.url || '');
+        setFieldValue('password', 'facebook-authenticated');
+        setFieldValue('terms', true);
+        setFieldValue('isStudent', 'no');
+        // Placeholder values for required fields
+        setFieldValue('business', 'N/A');
+        setFieldValue('phone', '');
+        setFieldValue('address', '');
+        setFieldValue('city', '');
+        setFieldValue('state', '');
+        setFieldValue('postalcode', '');
+        setFieldValue('accountnum', '');
+        setFieldValue('routenum', '');
+        setFieldValue('ssnitin', '');
+        setFieldValue('isFacebookLogin', true); // Set flag for Facebook login
+
+        // Call _registerAPI immediately
+        _registerAPI(
+          first_name || 'Facebook',
+          last_name || 'User',
+          'N/A', // Placeholder for business
+          '', // Phone
+          '', // Address
+          email || `${id}@facebook.com`,
+          'facebook-authenticated',
+          dob,
+          age,
+          '', // City
+          '', // State
+          '', // Postal code
+          '', // Account number
+          '', // Routing number
+          '', // SSN/ITIN
+          'no', // isStudent
+          picture?.data?.url || '',
+          true, // isFacebookLogin
+        );
+      }
+    } catch (error) {
+      console.error('Facebook login error:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Facebook signup failed. Please try again.',
+        topOffset: Platform.OS === 'ios' ? 20 : 0,
+        visibilityTime: 3000,
+        autoHide: true,
+      });
+    }
+  };
+
+  const _validationSchema = yup.object(
+    {
+      firstname: yup.string().required('Firstname is required.'),
+      lastname: yup.string().required('Lastname is required.'),
+      business: yup.string().when('$isFacebookLogin', {
+        is: true,
+        then: schema => schema.notRequired(),
+        otherwise: schema => schema.required('Business name is required.'),
+      }),
+      phone: yup.string().when('$isFacebookLogin', {
+        is: true,
+        then: schema => schema.notRequired(),
+        otherwise: schema => schema.required('Phone number is required'),
+      }),
+      address: yup.string().when('$isFacebookLogin', {
+        is: true,
+        then: schema => schema.notRequired(),
+        otherwise: schema => schema.required('Address is required'),
+      }),
+      email: yup
+        .string()
+        .email(`Well that's not an email`)
+        .matches(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'Invalid email format'),
+      password: yup
+        .string()
+        .min(8, 'Password must be at least 8 characters')
+        .when('$isFacebookLogin', {
+          is: true,
+          then: schema => schema.notRequired(),
+          otherwise: schema =>
+            schema
+              .required('Password is required')
+              .matches(
+                /^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&\-_\s])[A-Za-z\d@$!%*#?&\-_\s]{8,}$/,
+                'Must contain at least 8 characters, one uppercase letter, one lowercase letter, one number, and one special character',
+              ),
+        }),
+      dob: yup.object().shape({
+        day: yup
+          .number()
+          .required('Day is required')
+          .min(1, 'Invalid day')
+          .max(31, 'Invalid day'),
+        month: yup
+          .number()
+          .required('Month is required')
+          .min(1, 'Invalid month')
+          .max(12, 'Invalid month'),
+        year: yup
+          .number()
+          .required('Year is required')
+          .min(1900, 'Year must be after 1900')
+          .max(new Date().getFullYear(), 'Year cannot be in the future')
+          .test(
+            'is-adult',
+            'You must be at least 18 years old',
+            function (value) {
+              const {day, month} = this.parent;
+              const age = calculateAge({day, month, year: value});
+              return age >= 18;
+            },
+          ),
+      }),
+      age: yup.string().required('Age is required'),
+      city: yup.string().when('$isFacebookLogin', {
+        is: true,
+        then: schema => schema.notRequired(),
+        otherwise: schema => schema.required('City is required'),
+      }),
+      state: yup.string().when('$isFacebookLogin', {
+        is: true,
+        then: schema => schema.notRequired(),
+        otherwise: schema => schema.required('State is required'),
+      }),
+      postalcode: yup.string().when('$isFacebookLogin', {
+        is: true,
+        then: schema => schema.notRequired(),
+        otherwise: schema => schema.required('Postal code is required'),
+      }),
+      accountnum: yup.string().when('$isFacebookLogin', {
+        is: true,
+        then: schema => schema.notRequired(),
+        otherwise: schema => schema.required('Account number is required'),
+      }),
+      routenum: yup.string().when('$isFacebookLogin', {
+        is: true,
+        then: schema => schema.notRequired(),
+        otherwise: schema => schema.required('Routing number is required'),
+      }),
+      ssnitin: yup.string().when('$isFacebookLogin', {
+        is: true,
+        then: schema => schema.notRequired(),
+        otherwise: schema =>
+          schema
+            .matches(/^\d{9}$/, 'SSN/ITIN must be exactly 9 digits')
+            .required('SSN/ITIN number is required'),
+      }),
+      isStudent: yup.string().required('Please select if you are a student'),
+      image: yup.string().required('Please select an image'),
+      terms: yup
+        .boolean()
+        .oneOf([true], 'You must accept the terms and conditions')
+        .required('You must accept the terms and conditions'),
+    },
+    [['password', 'password']],
+  );
+
+  const _registerAPI = (
+    firstname,
+    lastname,
+    business,
+    mobile,
+    address,
+    email,
+    password,
+    dob,
+    age,
+    city,
+    state,
+    postalcode,
+    accountnum,
+    routenum,
+    ssnitin,
+    isStudent,
+    image,
+    isFacebookLogin = false,
+  ) => {
+    const formdata = new FormData();
+    const dateofbirth = `${dob.day}-${dob.month}-${dob.year}`;
+    const fullName = `${firstname} ${lastname}`.trim();
+    console.log('dateofbirth:', dateofbirth);
+    formdata.append('name', fullName);
+    formdata.append('business_name', business);
+    formdata.append('phone', mobile ? parseInt(mobile) : '');
+    formdata.append('address', address);
+    formdata.append('email', email);
+    formdata.append('password', password);
+    formdata.append('dob', dateofbirth);
+    formdata.append('age', age);
+    formdata.append('city', city);
+    formdata.append('state', state);
+    formdata.append('postalcode', postalcode);
+    formdata.append('account_number', accountnum);
+    formdata.append('routing_number', routenum);
+    formdata.append('ssn_number', ssnitin);
+    formdata.append('student', isStudent);
+    formdata.append('type', 'Driver');
+    if (image) {
+      formdata.append('image', {
+        uri: image,
+        type: 'image/jpeg',
+        name: `image${new Date()}.jpg`,
+      });
+    }
+    setIsLoading(true);
+    PostAPiwithToken({url: 'register'}, formdata)
+      .then(res => {
+        setIsLoading(false);
+        console.log('response data:', res);
+        if (res.status === 'success') {
+          Toast.show({
+            type: 'success',
+            text1: 'Success',
+            text2: res.message,
+            topOffset: Platform.OS === 'ios' ? 20 : 0,
+            visibilityTime: 3000,
+            autoHide: true,
+          });
+          console.log('mydata', res);
+          if (isFacebookLogin) {
+            // Navigate directly to AccountVerifyOtp_R for Facebook signup
+            navigation.navigate('AccountVerifyOtp_R', {user_res: res});
+          } else {
+            // Call _createExpressApi for manual signup
+            _createExpressApi(res);
+          }
+        } else {
+          setIsLoading(false);
+          Toast.show({
+            type: 'error',
+            text1: 'Error',
+            text2: res.message.email
+              ? res.message.email
+              : res.message?.email
+              ? res.message.email
+              : res.message,
+            topOffset: Platform.OS === 'ios' ? 20 : 0,
+            visibilityTime: 3000,
+            autoHide: true,
+          });
+        }
+        console.log('res of register:', res);
+      })
+      .catch(err => {
+        setIsLoading(false);
+        console.log('api error:', err);
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: 'Registration failed. Please try again.',
+          topOffset: Platform.OS === 'ios' ? 20 : 0,
+          visibilityTime: 3000,
+          autoHide: true,
+        });
+      });
+  };
+
+  const _createExpressApi = res => {
+    setIsLoading(true);
+    AllGetAPI({url: 'create-express', Token: res?.userdata?.api_token})
+      .then(res => {
+        setIsLoading(false);
+        console.log('create-express response:', JSON.stringify(res));
+        if (res?.status === 'success') {
+          navigation.navigate('AccountVerifyOtp_R', {user_res: res});
+          Toast.show({
+            type: 'success',
+            text1: 'Success',
+            text2: res.message,
+            topOffset: Platform.OS === 'ios' ? 20 : 0,
+            visibilityTime: 3000,
+            autoHide: true,
+          });
+        } else {
+          Toast.show({
+            type: 'error',
+            text1: 'Error',
+            text2: res.message || 'Failed to create express account',
+            topOffset: Platform.OS === 'ios' ? 20 : 0,
+            visibilityTime: 3000,
+            autoHide: true,
+          });
+        }
+      })
+      .catch(err => {
+        setIsLoading(false);
+        console.log('create-express api error:', err);
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: 'Failed to create express account',
+          topOffset: Platform.OS === 'ios' ? 20 : 0,
+          visibilityTime: 3000,
+          autoHide: true,
+        });
+      });
+  };
+
+  const renderSelection = () => {
+    return (
+      <View>
+        <Image
+          source={images.studentIcon}
+          resizeMode="contain"
+          style={{width: wp(6), height: wp(6), marginHorizontal: wp(2)}}
+        />
+      </View>
+    );
+  };
+
+  const Wrapper = Platform.OS === 'ios' ? KeyboardAvoidingView : View;
+  const {top, bottom} = useSafeAreaInsets();
+
+  return (
+    <Formik
+      initialValues={{
+        firstname: '',
+        lastname: '',
+        business: '',
+        phone: '',
+        address: '',
+        email: '',
+        password: '',
+        dob: {day: '', month: '', year: ''},
+        age: '',
+        city: '',
+        state: '',
+        postalcode: '',
+        accountnum: '',
+        routenum: '',
+        ssnitin: '',
+        isStudent: '',
+        image: '',
+        terms: false,
+        isFacebookLogin: false,
+      }}
+      validateOnMount={true}
+      onSubmit={values => {
+        console.log('Form submitted with values:', values);
+        _registerAPI(
+          values.firstname,
+          values.lastname,
+          values.business,
+          values.phone,
+          values.address,
+          values.email,
+          values.password,
+          values.dob,
+          values.age,
+          values.city,
+          values.state,
+          values.postalcode,
+          values.accountnum,
+          values.routenum,
+          values.ssnitin,
+          values.isStudent,
+          values.image,
+          values.isFacebookLogin,
+        );
+      }}
+      validationSchema={_validationSchema}
+      context={{isFacebookLogin: false}}>
+      {({
+        handleChange,
+        handleBlur,
+        handleSubmit,
+        values,
+        touched,
+        errors,
+        isValid,
+        setFieldValue,
+        setValues,
+      }) => {
+        useEffect(() => {
+          const age = calculateAge(values.dob);
+          if (age) {
+            setFieldValue('age', age);
+          }
+        }, [values.dob.day, values.dob.month, values.dob.year, setFieldValue]);
+
+        return (
+          <View
+            style={[
+              styles.mainContainer,
+              {paddingTop: Platform.OS === 'ios' ? top : 0},
+            ]}>
+            <KeyboardAvoidingView
+              behavior={
+                Platform.OS === 'ios'
+                  ? ''
+                  : keyboardStatus === true
+                  ? 'height'
+                  : 'undefined'
+              }
+              style={{flex: 1}}
+              keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}>
+              {isloading && <Loader />}
+              <Header
+                head="Let’s explore together!"
+                onPress={() => navigation.goBack()}
+              />
+              <Wrapper behavior="padding" style={{flex: 1}}>
+                <ScrollView
+                  keyboardShouldPersistTaps="handled"
+                  contentContainerStyle={{paddingBottom: wp(6)}}>
+                  <View style={{marginTop: wp(4), paddingHorizontal: wp(10)}}>
+                    <Text style={[styles.onboardTextP, {color: '#7D7F88'}]}>
+                      Create your Native Rider account to explore your dream
+                      ride and share ride with friends!
+                    </Text>
+                  </View>
+                  <View
+                    style={{
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      marginTop: wp(6),
+                    }}>
+                    <TouchableOpacity onPress={() => upload(setFieldValue)}>
+                      <Image
+                        source={
+                          values.image ? {uri: values.image} : images.avatar
+                        }
+                        resizeMode="cover"
+                        style={[
+                          styles.profileStyle,
+                          {
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            opacity: 0.9,
+                          },
+                        ]}
+                      />
+                    </TouchableOpacity>
+                    {errors.image && touched.image && (
+                      <Text style={[styles.imageerr]}>{errors.image}</Text>
+                    )}
+                  </View>
+                  <View style={[styles.inputView, {marginTop: wp(4)}]}>
+                    <Text style={styles.labelStyle}>First Name</Text>
+                    <View style={styles.inputViewStyle}>
+                      <Image
+                        source={images.usernameIcon}
+                        resizeMode="contain"
+                        style={{width: wp(5), height: wp(6)}}
+                      />
+                      <TextInput
+                        placeholder="First Name"
+                        placeholderTextColor={Colors.lightgrey}
+                        keyboardType="default"
+                        style={styles.inputStyle}
+                        onChangeText={handleChange('firstname')}
+                        onBlur={handleBlur('firstname')}
+                        value={values.firstname}
+                      />
+                    </View>
+                    {errors.firstname && touched.firstname && (
+                      <Text style={[styles.errortxt]}>{errors.firstname}</Text>
+                    )}
+                  </View>
+                  <View style={[styles.inputView, {marginTop: wp(4)}]}>
+                    <Text style={styles.labelStyle}>Last Name</Text>
+                    <View style={styles.inputViewStyle}>
+                      <Image
+                        source={images.usernameIcon}
+                        resizeMode="contain"
+                        style={{width: wp(5), height: wp(6)}}
+                      />
+                      <TextInput
+                        placeholder="Last Name"
+                        placeholderTextColor={Colors.lightgrey}
+                        keyboardType="default"
+                        style={styles.inputStyle}
+                        onChangeText={handleChange('lastname')}
+                        onBlur={handleBlur('lastname')}
+                        value={values.lastname}
+                      />
+                    </View>
+                    {errors.lastname && touched.lastname && (
+                      <Text style={[styles.errortxt]}>{errors.lastname}</Text>
+                    )}
+                  </View>
+                  <View style={[styles.inputView, {marginTop: wp(4)}]}>
+                    <Text style={styles.labelStyle}>Business Name</Text>
+                    <View style={styles.inputViewStyle}>
+                      <Image
+                        source={images.usernameIcon}
+                        resizeMode="contain"
+                        style={{width: wp(5), height: wp(6)}}
+                      />
+                      <TextInput
+                        placeholder="Business Name"
+                        placeholderTextColor={Colors.lightgrey}
+                        keyboardType="default"
+                        style={styles.inputStyle}
+                        onChangeText={handleChange('business')}
+                        onBlur={handleBlur('business')}
+                        value={values.business}
+                      />
+                    </View>
+                    {errors.business && touched.business && (
+                      <Text style={[styles.errortxt]}>{errors.business}</Text>
+                    )}
+                  </View>
+                  <View style={[styles.inputView, {marginTop: wp(4)}]}>
+                    <Text style={styles.labelStyle}>Phone Number</Text>
+                    <View style={[styles.inputViewStyle, {paddingLeft: wp(2)}]}>
+                      <PhoneInput
+                        ref={phoneInput}
+                        defaultValue={value}
+                        defaultCode="US"
+                        layout="first"
+                        onChangeText={text => {
+                          setValue(text);
+                        }}
+                        onChangeFormattedText={text => {
+                          handleChange('phone')(text);
+                        }}
+                        withDarkTheme={false}
+                        autoFocus={false}
+                        placeholder="Enter Number"
+                        placeholderTextColor="black"
+                        containerStyle={styles.phoneContainerStyle}
+                        textContainerStyle={styles.phonetextContainer}
+                        textInputStyle={{
+                          color: 'black',
+                          fontFamily: fonts.medium,
+                          fontSize: 14,
+                        }}
+                        codeTextStyle={{
+                          display: 'none',
+                        }}
+                        textInputProps={{
+                          placeholder: 'Enter your phone number',
+                          placeholderTextColor: Colors.lightgrey,
+                          fontFamily: fonts.medium,
+                          height: wp(12),
+                        }}
+                      />
+                    </View>
+                    {errors.phone && touched.phone && (
+                      <Text style={[styles.errortxt]}>{errors.phone}</Text>
+                    )}
+                  </View>
+                  <View style={[styles.inputView, {marginTop: wp(4)}]}>
+                    <Text style={styles.labelStyle}>Address</Text>
+                    <View style={styles.inputViewStyle}>
+                      <Image
+                        source={images.addressIcon}
+                        resizeMode="contain"
+                        style={{width: wp(5), height: wp(6)}}
+                      />
+                      <TextInput
+                        placeholder="Enter address"
+                        placeholderTextColor={Colors.lightgrey}
+                        keyboardType="default"
+                        style={styles.inputStyle}
+                        onChangeText={handleChange('address')}
+                        onBlur={handleBlur('address')}
+                        value={values.address}
+                      />
+                    </View>
+                    {errors.address && touched.address && (
+                      <Text style={[styles.errortxt]}>{errors.address}</Text>
+                    )}
+                  </View>
+                  <View style={[styles.inputView, {marginTop: wp(4)}]}>
+                    <Text style={styles.labelStyle}>Email Address</Text>
+                    <View style={styles.inputViewStyle}>
+                      <Image
+                        source={images.gmailIcon}
+                        resizeMode="contain"
+                        style={{width: wp(5), height: wp(6)}}
+                      />
+                      <TextInput
+                        placeholder="e-mail"
+                        placeholderTextColor={Colors.lightgrey}
+                        keyboardType="email-address"
+                        style={styles.inputStyle}
+                        autoCapitalize="none"
+                        onChangeText={handleChange('email')}
+                        onBlur={handleBlur('email')}
+                        value={values.email}
+                      />
+                    </View>
+                    {errors.email && touched.email && (
+                      <Text style={[styles.errortxt]}>{errors.email}</Text>
+                    )}
+                  </View>
+                  <View style={[styles.inputView, {marginTop: wp(4)}]}>
+                    <Text style={styles.labelStyle}>Password</Text>
+                    <View style={styles.inputViewStyle}>
+                      <View
+                        style={{flexDirection: 'row', alignItems: 'center'}}>
+                        <Image
+                          source={images.passkey}
+                          resizeMode="contain"
+                          style={{width: wp(5), height: wp(6)}}
+                        />
+                        <TextInput
+                          placeholder="Insert your password here"
+                          placeholderTextColor={Colors.lightgrey}
+                          keyboardType="default"
+                          style={[styles.inputStyle, {width: wp(70)}]}
+                          secureTextEntry={!show}
+                          onChangeText={text => {
+                            handleChange('password')(text);
+                            setIsPasswordEntered(text.length > 0);
+                          }}
+                          onBlur={handleBlur('password')}
+                          value={values.password}
+                        />
+                      </View>
+                      {isPasswordEntered && (
+                        <TouchableOpacity
+                          onPress={() => setshow(!show)}
+                          style={{paddingRight: wp(3)}}>
+                          <Feather
+                            name={!show ? 'eye-off' : 'eye'}
+                            size={20}
+                            color={Colors.buttoncolor}
+                          />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                    {errors.password && touched.password && (
+                      <Text style={[styles.errortxt]}>{errors.password}</Text>
+                    )}
+                  </View>
+                  <View style={[styles.inputView, {marginTop: wp(4)}]}>
+                    <Text style={styles.labelStyle}>Date of Birth</Text>
+                    <View style={styles.inputRow}>
+                      <TextInput
+                        ref={dayRef}
+                        style={styles.input}
+                        placeholder="DD"
+                        placeholderTextColor={Colors.lightgrey}
+                        maxLength={2}
+                        keyboardType="numeric"
+                        onChangeText={text =>
+                          handleDayChange(text, setFieldValue)
+                        }
+                        value={values.dob.day}
+                      />
+                      <TextInput
+                        ref={monthRef}
+                        style={styles.input}
+                        placeholder="MM"
+                        placeholderTextColor={Colors.lightgrey}
+                        maxLength={2}
+                        keyboardType="numeric"
+                        onChangeText={text =>
+                          handleMonthChange(text, setFieldValue)
+                        }
+                        value={values.dob.month}
+                      />
+                      <TextInput
+                        ref={yearRef}
+                        style={styles.inputLong}
+                        placeholder="YYYY"
+                        placeholderTextColor={Colors.lightgrey}
+                        maxLength={4}
+                        keyboardType="numeric"
+                        onChangeText={text => {
+                          let year = parseInt(text, 10);
+                          const currentYear = new Date().getFullYear();
+                          if (year > currentYear) year = currentYear;
+                          setFieldValue(
+                            'dob.year',
+                            year ? year.toString() : '',
+                          );
+                        }}
+                        value={values.dob.year}
+                      />
+                    </View>
+                    {errors.dob && (
+                      <Text style={[styles.errortxt]}>
+                        {errors.dob.day || errors.dob.month || errors.dob.year}
+                      </Text>
+                    )}
+                  </View>
+                  <View style={[styles.inputView, {marginTop: wp(4)}]}>
+                    <Text style={styles.labelStyle}>Age</Text>
+                    <View style={styles.inputViewStyle}>
+                      <Image
+                        source={images.dbirthIcon}
+                        resizeMode="contain"
+                        style={{width: wp(5), height: wp(6)}}
+                      />
+                      <TextInput
+                        placeholder="Enter your age"
+                        placeholderTextColor={Colors.lightgrey}
+                        keyboardType="numeric"
+                        style={styles.inputStyle}
+                        onChangeText={handleChange('age')}
+                        onBlur={handleBlur('age')}
+                        value={values.age}
+                        editable={false}
+                      />
+                    </View>
+                    {errors.age && touched.age && (
+                      <Text style={[styles.errortxt]}>{errors.age}</Text>
+                    )}
+                  </View>
+                  <View style={[styles.inputView, {marginTop: wp(4)}]}>
+                    <Text style={styles.labelStyle}>City</Text>
+                    <View style={styles.inputViewStyle}>
+                      <Image
+                        source={images.cityIcon}
+                        resizeMode="contain"
+                        style={{width: wp(5), height: wp(5)}}
+                      />
+                      <TextInput
+                        placeholder="Enter City"
+                        placeholderTextColor={Colors.lightgrey}
+                        keyboardType="default"
+                        style={styles.inputStyle}
+                        onChangeText={handleChange('city')}
+                        onBlur={handleBlur('city')}
+                        value={values.city}
+                      />
+                    </View>
+                    {errors.city && touched.city && (
+                      <Text style={[styles.errortxt]}>{errors.city}</Text>
+                    )}
+                  </View>
+                  <View style={[styles.inputView, {marginTop: wp(4)}]}>
+                    <Text style={styles.labelStyle}>State</Text>
+                    <View style={styles.inputViewStyle}>
+                      <Image
+                        source={images.stateIcon}
+                        resizeMode="contain"
+                        style={{width: wp(5), height: wp(5)}}
+                      />
+                      <TextInput
+                        placeholder="Enter State"
+                        placeholderTextColor={Colors.lightgrey}
+                        keyboardType="default"
+                        style={styles.inputStyle}
+                        onChangeText={handleChange('state')}
+                        onBlur={handleBlur('state')}
+                        value={values.state}
+                      />
+                    </View>
+                    {errors.state && touched.state && (
+                      <Text style={[styles.errortxt]}>{errors.state}</Text>
+                    )}
+                  </View>
+                  <View style={[styles.inputView, {marginTop: wp(4)}]}>
+                    <Text style={styles.labelStyle}>Postal Code</Text>
+                    <View style={styles.inputViewStyle}>
+                      <Image
+                        source={images.postalcodeIcon}
+                        resizeMode="contain"
+                        style={{width: wp(5), height: wp(5)}}
+                      />
+                      <TextInput
+                        placeholder="Enter Postal Code"
+                        placeholderTextColor={Colors.lightgrey}
+                        keyboardType="number-pad"
+                        style={styles.inputStyle}
+                        onChangeText={handleChange('postalcode')}
+                        onBlur={handleBlur('postalcode')}
+                        value={values.postalcode}
+                      />
+                    </View>
+                    {errors.postalcode && touched.postalcode && (
+                      <Text style={[styles.errortxt]}>{errors.postalcode}</Text>
+                    )}
+                  </View>
+                  <View style={[styles.inputView, {marginTop: wp(4)}]}>
+                    <Text style={styles.labelStyle}>Account Number</Text>
+                    <View style={styles.inputViewStyle}>
+                      <Image
+                        source={images.ibanIcon}
+                        resizeMode="contain"
+                        style={{width: wp(5), height: wp(5)}}
+                      />
+                      <TextInput
+                        placeholder="Enter Number"
+                        placeholderTextColor={Colors.lightgrey}
+                        keyboardType="number-pad"
+                        style={styles.inputStyle}
+                        onChangeText={handleChange('accountnum')}
+                        onBlur={handleBlur('accountnum')}
+                        value={values.accountnum}
+                        maxLength={12}
+                      />
+                    </View>
+                    {errors.accountnum && touched.accountnum && (
+                      <Text style={[styles.errortxt]}>{errors.accountnum}</Text>
+                    )}
+                  </View>
+                  <View style={[styles.inputView, {marginTop: wp(4)}]}>
+                    <Text style={styles.labelStyle}>Routing Number</Text>
+                    <View style={styles.inputViewStyle}>
+                      <Image
+                        source={images.ibanIcon}
+                        resizeMode="contain"
+                        style={{width: wp(5), height: wp(5)}}
+                      />
+                      <TextInput
+                        placeholder="Enter Number"
+                        placeholderTextColor={Colors.lightgrey}
+                        keyboardType="number-pad"
+                        style={styles.inputStyle}
+                        onChangeText={handleChange('routenum')}
+                        onBlur={handleBlur('routenum')}
+                        value={values.routenum}
+                        maxLength={9}
+                      />
+                    </View>
+                    {errors.routenum && touched.routenum && (
+                      <Text style={[styles.errortxt]}>{errors.routenum}</Text>
+                    )}
+                  </View>
+                  <View style={[styles.inputView, {marginTop: wp(4)}]}>
+                    <Text style={styles.labelStyle}>
+                      Social Security Number (SSN) or Individual Taxpayer
+                      Identification Number (ITIN)
+                    </Text>
+                    <View style={styles.inputViewStyle}>
+                      <Image
+                        source={images.ibanIcon}
+                        resizeMode="contain"
+                        style={{width: wp(5), height: wp(5)}}
+                      />
+                      <TextInput
+                        placeholder="Enter full ssn/itin Number"
+                        placeholderTextColor={Colors.lightgrey}
+                        keyboardType="number-pad"
+                        style={styles.inputStyle}
+                        onChangeText={handleChange('ssnitin')}
+                        onBlur={handleBlur('ssnitin')}
+                        value={values.ssnitin}
+                        maxLength={9}
+                      />
+                    </View>
+                    {errors.ssnitin && touched.ssnitin && (
+                      <Text style={[styles.errortxt]}>{errors.ssnitin}</Text>
+                    )}
+                  </View>
+                  <View style={[styles.inputView, {marginTop: wp(4)}]}>
+                    <Text style={styles.labelStyle}>Are you student?</Text>
+                    <Dropdown
+                      data={selection}
+                      labelField="label"
+                      valueField="value"
+                      placeholder="Select"
+                      placeholderStyle={{color: Colors.lightgrey}}
+                      value={values.isStudent}
+                      itemTextStyle={{
+                        fontSize: 14,
+                        color: Colors.black,
+                        fontFamily: fonts.medium,
+                        textAlign: 'center',
+                      }}
+                      selectedTextStyle={{
+                        fontSize: 14,
+                        color: Colors.black,
+                        fontFamily: fonts.medium,
+                      }}
+                      maxHeight={wp(65)}
+                      containerStyle={{
+                        width: wp(40),
+                        alignSelf: 'flex-end',
+                        marginRight: wp(10),
+                        borderRadius: wp(4),
+                      }}
+                      itemContainerStyle={{
+                        borderBottomWidth: 1,
+                        borderColor: Colors.grey,
+                        width: wp(40),
+                        borderTopLeftRadius: wp(4),
+                        borderTopRightRadius: wp(4),
+                      }}
+                      onChange={item => {
+                        setFieldValue('isStudent', item.value);
+                        setIsFocus(false);
+                      }}
+                      renderLeftIcon={renderSelection}
+                      style={styles.dropdown}
+                      onFocus={() => setIsFocus(true)}
+                      onBlur={() => setIsFocus(false)}
+                      renderRightIcon={() => (
+                        <AntDesign
+                          style={styles.icon}
+                          color={isFocus ? Colors.buttoncolor : 'black'}
+                          name={isFocus ? 'up' : 'down'}
+                          size={18}
+                        />
+                      )}
+                    />
+                    {errors.isStudent && touched.isStudent && (
+                      <Text style={[styles.errortxt]}>{errors.isStudent}</Text>
+                    )}
+                  </View>
+                  <View>
+                    <View style={styles.checkrow}>
+                      <View style={{flexDirection: 'row'}}>
+                        <TouchableOpacity
+                          onPress={() => setFieldValue('terms', !values.terms)}>
+                          <Ionicons
+                            name={
+                              values.terms ? 'checkbox' : 'checkbox-outline'
+                            }
+                            size={18}
+                            color={values.terms ? Colors.buttoncolor : 'grey'}
+                          />
+                        </TouchableOpacity>
+                        <View
+                          style={{flexDirection: 'row', alignItems: 'center'}}>
+                          <Text
+                            style={{
+                              fontSize: 11,
+                              color: Colors.lightblack,
+                              fontFamily: fonts.medium,
+                              paddingLeft: wp(1),
+                            }}>
+                            I agree to all{' '}
+                          </Text>
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                            }}>
+                            <TouchableOpacity
+                              //  onPress={() => navigation.navigate('Terms')}>
+                              onPress={() =>
+                                Linking.openURL(
+                                  'https://nativeriderapp.com/term',
+                                )
+                              }>
+                              <Text
+                                style={[
+                                  styles.textStyle,
+                                  {
+                                    color: Colors.buttoncolor,
+                                    fontSize: 12,
+                                    fontFamily: fonts.bold,
+                                  },
+                                ]}>
+                                Terms and Conditions,
+                              </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              // onPress={() => navigation.navigate('PrivacyPolicy')}>
+                              onPress={() =>
+                                Linking.openURL(
+                                  'https://nativeriderapp.com/privacy',
+                                )
+                              }>
+                              <Text
+                                style={[
+                                  styles.textStyle,
+                                  {
+                                    color: Colors.buttoncolor,
+                                    fontSize: 12,
+                                    fontFamily: fonts.bold,
+                                  },
+                                ]}>
+                                {' Privacy Policy'}
+                              </Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      </View>
+                    </View>
+                    {errors.terms && touched.terms && (
+                      <Text style={[styles.errortxt, {marginLeft: wp(6)}]}>
+                        {errors.terms}
+                      </Text>
+                    )}
+                  </View>
+                  <View style={{marginTop: wp(10)}}>
+                    <MainButton title="Create account" onPress={handleSubmit} />
+                  </View>
+                  <View style={[styles.bottomView, {marginTop: wp(4)}]}>
+                    <Text style={styles.bottomText}>
+                      Already have an Account?
+                    </Text>
+                    <TouchableOpacity
+                      activeOpacity={0.4}
+                      onPress={() => navigation.navigate('Login_R')}>
+                      <Text
+                        style={[
+                          styles.bottomText,
+                          {
+                            color: Colors.buttoncolor,
+                            fontFamily: fonts.bold,
+                            fontSize: 14,
+                          },
+                        ]}>
+                        {' '}
+                        Log In
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      justifyContent: 'space-evenly',
+                      alignItems: 'center',
+                      marginHorizontal: wp(12),
+                      marginTop: wp(3),
+                    }}>
+                    <View
+                      style={{
+                        width: wp(30),
+                        height: wp(0.4),
+                        backgroundColor: Colors.grey,
+                      }}></View>
+                    <Text
+                      style={{
+                        fontSize: 14,
+                        fontFamily: fonts.regular,
+                        color: Colors.black,
+                      }}>
+                      OR
+                    </Text>
+                    <View
+                      style={{
+                        width: wp(30),
+                        height: wp(0.4),
+                        backgroundColor: Colors.grey,
+                      }}></View>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => handleFacebookLogin(setFieldValue, values)}
+                    style={[styles.facebookbutton, {flexDirection: 'row'}]}>
+                    <Image
+                      source={images.facebookicon}
+                      resizeMode="contain"
+                      style={{width: wp(5), height: wp(5), marginRight: wp(2)}}
+                    />
+                    <Text style={[styles.titleText]}>
+                      Register With Facebook
+                    </Text>
+                  </TouchableOpacity>
+                </ScrollView>
+              </Wrapper>
+            </KeyboardAvoidingView>
+          </View>
+        );
+      }}
+    </Formik>
+  );
+};
+
+export default SignUp_R;
