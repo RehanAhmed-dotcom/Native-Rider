@@ -19,11 +19,12 @@ import {
 } from 'react-native-responsive-screen';
 import MainButton from '../../../components/MainButton';
 import Header from '../../../components/Header';
+import { launchImageLibrary } from 'react-native-image-picker';
+import ImageResizer from 'react-native-image-resizer';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import Feather from 'react-native-vector-icons/Feather';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import PhoneInput from 'react-native-phone-number-input';
-import ImageCropPicker from 'react-native-image-crop-picker';
 import {Dropdown} from 'react-native-element-dropdown';
 import {useDispatch, useSelector} from 'react-redux';
 import {PostAPiwithToken} from '../../../components/ApiRoot';
@@ -64,16 +65,46 @@ const EditVehicelInfo_R = ({navigation}) => {
     };
   }, []);
   const selectImage = async setter => {
-    try {
-      const image = await ImageCropPicker.openPicker({
-        width: 400,
-        height: 400,
-        cropping: true,
-        compressImageQuality: 1,
+    // try {
+    //   const image = await ImageCropPicker.openPicker({
+    //     width: 400,
+    //     height: 400,
+    //     cropping: true,
+    //     compressImageQuality: 1,
+    //   });
+    //   setter(image.path);
+    // } catch (error) {
+    //   console.log('Image selection canceled or failed', error);
+    // }
+   try {
+      const result = await launchImageLibrary({
+        mediaType: 'photo',
+        selectionLimit: 1,
+        quality: 1,
       });
-      setter(image.path);
+  
+      if (result.didCancel) return;
+  
+      const asset = result.assets?.[0];
+      if (!asset?.uri) {
+        console.error('No image selected');
+        return;
+      }
+  
+      // Resize to 400x400 (Play-safe alternative to cropping)
+      const resized = await ImageResizer.createResizedImage(
+        asset.uri,
+        400,
+        400,
+        'JPEG',
+        100,
+        0
+      );
+  
+      // setFieldValue('image', resized.uri);
+      setter( resized.uri)
     } catch (error) {
-      console.log('Image selection canceled or failed', error);
+      console.error('Error picking image:', error);
     }
   };
   const vehicleTypes = [

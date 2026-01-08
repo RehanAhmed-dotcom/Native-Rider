@@ -21,7 +21,8 @@ import MainButton from '../../../components/MainButton';
 import Header from '../../../components/Header';
 import Feather from 'react-native-vector-icons/Feather';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import ImageCropPicker from 'react-native-image-crop-picker';
+import { launchImageLibrary } from 'react-native-image-picker';
+import ImageResizer from 'react-native-image-resizer';
 import {Dropdown} from 'react-native-element-dropdown';
 import * as yup from 'yup';
 import {Formik} from 'formik';
@@ -61,24 +62,57 @@ const VehicleRegistration = ({navigation, route}) => {
     };
   }, []);
 
+  // const selectImage = async (setFieldValue, imageType) => {
+  //   try {
+  //     const image = await ImageCropPicker.openPicker({
+  //       width: 400,
+  //       height: 400,
+  //       cropping: true,
+  //       compressImageQuality: 1,
+  //     });
+  //     if (image && image.path) {
+  //       setFieldValue(imageType, image.path);
+  //     } else {
+  //       console.error('No image path found');
+  //     }
+  //   } catch (error) {
+  //     console.log('Image selection canceled or failed', error);
+  //   }
+  // };
   const selectImage = async (setFieldValue, imageType) => {
     try {
-      const image = await ImageCropPicker.openPicker({
-        width: 400,
-        height: 400,
-        cropping: true,
-        compressImageQuality: 1,
+      const result = await launchImageLibrary({
+        mediaType: 'photo',
+        selectionLimit: 1,
+        quality: 1,
       });
-      if (image && image.path) {
-        setFieldValue(imageType, image.path);
-      } else {
-        console.error('No image path found');
+  
+      if (result.didCancel) return;
+  
+      const asset = result.assets?.[0];
+      if (!asset?.uri) {
+        console.error('No image selected');
+        return;
       }
+  
+      // Resize / crop-like behavior (400x400)
+      const resized = await ImageResizer.createResizedImage(
+        asset.uri,
+        400,
+        400,
+        'JPEG',
+        100,
+        0,
+        undefined,
+        false,
+        { mode: 'cover' } // mimics cropping
+      );
+  
+      setFieldValue(imageType, resized.uri);
     } catch (error) {
       console.log('Image selection canceled or failed', error);
     }
   };
-
   const vehicleTypes = [
     {label: 'Sedan', value: 'Sedan'},
     {label: 'SUV', value: 'SUV'},

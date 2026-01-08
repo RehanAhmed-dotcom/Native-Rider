@@ -21,7 +21,6 @@ import MainButton from '../../../components/MainButton';
 import Header from '../../../components/Header';
 import Feather from 'react-native-vector-icons/Feather';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import ImageCropPicker from 'react-native-image-crop-picker';
 import {Dropdown} from 'react-native-element-dropdown';
 import * as yup from 'yup';
 import {Formik} from 'formik';

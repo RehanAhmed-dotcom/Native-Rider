@@ -17,12 +17,13 @@ import {
   widthPercentageToDP as wp,
   heightPercentageToDP as hp,
 } from 'react-native-responsive-screen';
+import { launchImageLibrary } from 'react-native-image-picker';
+import ImageResizer from 'react-native-image-resizer';
 import MainButton from '../../../components/MainButton';
 import Header from '../../../components/Header';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import Feather from 'react-native-vector-icons/Feather';
 import PhoneInput from 'react-native-phone-number-input';
-import ImageCropPicker from 'react-native-image-crop-picker';
 
 import AntDesign from 'react-native-vector-icons/AntDesign';
 import LightButton from '../../../components/LightButton';
@@ -117,19 +118,50 @@ const EditProfile_R = ({navigation}) => {
     {label: 'No', value: 'no'},
   ];
   const upload = async () => {
+    // try {
+    //   const selectedImage = await ImageCropPicker.openPicker({
+    //     width: 400,
+    //     height: 400,
+    //     cropping: true,
+    //     compressImageQuality: 1,
+    //   });
+    //   console.log('Selected Image:', selectedImage);
+    //   if (selectedImage && selectedImage.path) {
+    //     setimage(selectedImage.path); // Update the state with the selected image path
+    //   } else {
+    //     console.error('No image path found');
+    //   }
+    // } catch (error) {
+    //   console.error('Error picking image:', error);
+    // }
     try {
-      const selectedImage = await ImageCropPicker.openPicker({
-        width: 400,
-        height: 400,
-        cropping: true,
-        compressImageQuality: 1,
+      const result = await launchImageLibrary({
+        mediaType: 'photo',
+        selectionLimit: 1,
+        quality: 1,
       });
-      console.log('Selected Image:', selectedImage);
-      if (selectedImage && selectedImage.path) {
-        setimage(selectedImage.path); // Update the state with the selected image path
-      } else {
-        console.error('No image path found');
+  
+      if (result.didCancel) return;
+  
+      const asset = result.assets?.[0];
+      if (!asset?.uri) {
+        console.error('No image selected');
+        return;
       }
+  
+      // Resize to 400x400 (Play-safe alternative to cropping)
+      const resized = await ImageResizer.createResizedImage(
+        asset.uri,
+        400,
+        400,
+        'JPEG',
+        100,
+        0
+      );
+  
+      // setFieldValue('image', resized.uri);
+      // setimage( resized.uri)
+      setimage(resized.uri);
     } catch (error) {
       console.error('Error picking image:', error);
     }

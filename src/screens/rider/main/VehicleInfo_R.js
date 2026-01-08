@@ -8,7 +8,6 @@ import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import Feather from 'react-native-vector-icons/Feather'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import PhoneInput from 'react-native-phone-number-input';
-import ImageCropPicker from 'react-native-image-crop-picker';
 import { Dropdown } from "react-native-element-dropdown";
 import AntDesign from 'react-native-vector-icons/AntDesign';
 import { useSelector } from 'react-redux'
@@ -42,19 +41,7 @@ const VehicleInfo_R = ({ navigation }) => {
     const [insuranceImage, setInsuranceImage] = useState(null);
     const [registrationImage, setRegistrationImage] = useState(null);
     const [driverLicenseImage, setDriverLicenseImage] = useState(null);
-    const selectImage = async (setter) => {
-        try {
-            const image = await ImageCropPicker.openPicker({
-                width: 400,
-                height: 400,
-                cropping: true,
-                compressImageQuality: 1,
-            });
-            setter(image.path);
-        } catch (error) {
-            console.log("Image selection canceled or failed", error);
-        }
-    };
+   
     const vehicleTypes = [
         { label: "Sedan", value: "sedan" },
         { label: "SUV", value: "suv" },
