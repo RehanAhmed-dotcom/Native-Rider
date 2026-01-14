@@ -29,7 +29,6 @@ import Fontisto from 'react-native-vector-icons/Fontisto';
 import MapView, {Marker, Polyline} from 'react-native-maps';
 import MapViewDirections from 'react-native-maps-directions';
 import {Google_Map_Key} from '../../../components/GoogleMapkey';
-import Geolocation from 'react-native-geolocation-service';
 import RBSheet from 'react-native-raw-bottom-sheet';
 import DateTimePicker from 'react-native-modal-datetime-picker';
 import Toast from 'react-native-toast-message';

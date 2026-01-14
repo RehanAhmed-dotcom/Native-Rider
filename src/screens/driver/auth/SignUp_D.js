@@ -583,9 +583,9 @@ const SignUp_D = ({navigation}) => {
                           fontFamily: fonts.medium,
                           fontSize: 14,
                         }}
-                        codeTextStyle={{
-                          display: 'none',
-                        }}
+                        // codeTextStyle={{
+                        //   display: 'none',
+                        // }}
                         textInputProps={{
                           placeholder: 'Enter your phone number',
                           placeholderTextColor: Colors.lightgrey,

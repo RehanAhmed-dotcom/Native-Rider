@@ -22,7 +22,7 @@ import {setOnboardingFalse} from '../../../redux/OnboardingSlice';
 import AntDesign from 'react-native-vector-icons/AntDesign';
 import {useDispatch} from 'react-redux';
 import {setUserType} from '../../../redux/Auth';
-import Geolocation from 'react-native-geolocation-service';
+import Geolocation from '@react-native-community/geolocation';
 import {check, request, PERMISSIONS, RESULTS} from 'react-native-permissions';
 import Toast from 'react-native-toast-message';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -35,42 +35,109 @@ const Welcome_R = ({navigation}) => {
     setConfirm(false);
   };
 
+  // const requestLocationPermission = async () => {
+  //   const permission =
+  //     Platform.OS === 'ios'
+  //       ? PERMISSIONS.IOS.LOCATION_WHEN_IN_USE
+  //       : PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION;
+  //   console.log('permission got');
+  //   const result = await request(permission);
+  //   console.log('res', result);
+  //   if (result === RESULTS.GRANTED) {
+  //     getLocation();
+  //     // console.log("get location function")
+  //   } else {
+  //     Alert.alert(
+  //       'Permission Denied',
+  //       'Location permission is required to find nearby requests.',
+  //     );
+  //   }
+  // };
   const requestLocationPermission = async () => {
-    const permission =
-      Platform.OS === 'ios'
-        ? PERMISSIONS.IOS.LOCATION_WHEN_IN_USE
-        : PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION;
-    console.log('ss');
-    const result = await request(permission);
-    console.log('res', result);
-    if (result === RESULTS.GRANTED) {
-      getLocation();
-    } else {
-      Alert.alert(
-        'Permission Denied',
-        'Location permission is required to find nearby requests.',
-      );
+    try {
+      const permission =
+        Platform.OS === 'android'
+          ? PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION
+          : PERMISSIONS.IOS.LOCATION_WHEN_IN_USE;
+  
+      // 1️⃣ Check first
+      const status = await check(permission);
+      console.log('permission status:', status);
+  
+      if (status === RESULTS.GRANTED) {
+        getLocation();
+        return;
+      }
+  
+      // 2️⃣ Ask only if denied
+      if (status === RESULTS.DENIED) {
+        const result = await request(permission);
+        console.log('request result:', result);
+  
+        if (result === RESULTS.GRANTED) {
+          getLocation();
+        } else {
+          Alert.alert(
+            'Permission Required',
+            'Please allow location permission to continue.'
+          );
+        }
+        return;
+      }
+  
+      // 3️⃣ Handle BLOCKED (THIS PREVENTS CRASH)
+      if (status === RESULTS.BLOCKED) {
+        Alert.alert(
+          'Permission Blocked',
+          'Location permission is blocked. Please enable it from Settings.'
+        );
+      }
+    } catch (error) {
+      console.log('Location permission error:', error);
     }
   };
-
+  // const getLocation = () => {
+  //   Geolocation.getCurrentPosition(
+  //     position => {
+  //       const {latitude, longitude} = position.coords;
+  //       console.log('Latitude:', latitude, 'Longitude:', longitude);
+  //       // Alert.alert(
+  //       //     'Location Retrieved',
+  //       //     `Latitude: ${latitude}, Longitude: ${longitude}`
+  //       // );
+  //       // saveLocationEnabled();
+  //       closemodal();
+  //     },
+  //     error => {
+  //       console.error(error);
+  //       Alert.alert('Error', 'Unable to retrieve location. Please try again.');
+  //     },
+  //     {enableHighAccuracy: false, timeout: 15000, maximumAge: 10000},
+  //   );
+  // };
   const getLocation = () => {
-    Geolocation.getCurrentPosition(
-      position => {
-        const {latitude, longitude} = position.coords;
-        console.log('Latitude:', latitude, 'Longitude:', longitude);
-        // Alert.alert(
-        //     'Location Retrieved',
-        //     `Latitude: ${latitude}, Longitude: ${longitude}`
-        // );
-        // saveLocationEnabled();
-        closemodal();
-      },
-      error => {
-        console.error(error);
-        Alert.alert('Error', 'Unable to retrieve location. Please try again.');
-      },
-      {enableHighAccuracy: true, timeout: 15000, maximumAge: 10000},
-    );
+    // Geolocation.getCurrentPosition(
+    //   position => {
+    //     const { latitude, longitude } = position.coords;
+    //     console.log('Latitude:', latitude, 'Longitude:', longitude);
+    //     closemodal();
+    //   },
+    //   error => {
+    //     console.log('Location error:', error);
+    //     Alert.alert(
+    //       'Location Error',
+    //       error.message || 'Unable to retrieve location.'
+    //     );
+    //   },
+    //   {
+    //     enableHighAccuracy: false,
+    //     timeout: 20000,
+    //     maximumAge: 10000,
+    //     forceRequestLocation: true,
+    //     showLocationDialog: true,
+    //   }
+    // );
+    Geolocation.getCurrentPosition(info =>{ console.log("info",info.coords.latitude);  closemodal();});
   };
 
   const saveLocationEnabled = async () => {

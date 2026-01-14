@@ -14,7 +14,6 @@ import MapView, {Marker, Polyline} from 'react-native-maps';
 import MapViewDirections from 'react-native-maps-directions';
 import {Google_Map_Key} from '../../../components/GoogleMapkey';
 import {images, fonts, Colors} from '../../../constant/Index';
-// import Geolocation from 'react-native-geolocation-service';
 import RBSheet from 'react-native-raw-bottom-sheet';
 import {
   widthPercentageToDP as wp,
